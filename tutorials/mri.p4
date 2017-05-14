@@ -1,5 +1,10 @@
 /* -*- P4_16 -*- */
+
+// This is the P4-16 core library, which declares 
+// some built-in P4 constructs using P4
 #include <core.p4>
+
+// P4-16 declaration of the P4 v1.0 switch model
 #include <v1model.p4>
 
 const bit<8>  UDP_PROTOCOL = 0x11;
@@ -16,6 +21,8 @@ typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 typedef bit<32> switchID_t;
+
+// header or struct
 
 header ethernet_t {
     macAddr_t dstAddr;
@@ -53,6 +60,8 @@ header switch_t {
     switchID_t  swid;
 }
 
+// struct => metadata declaration 
+
 struct ingress_metadata_t {
     bit<16>  count;
 }
@@ -66,7 +75,7 @@ struct metadata {
     parser_metadata_t   parser_metadata;
 }
 
-struct headers {
+struct headers { // headers struct declaration
     ethernet_t   ethernet;
     ipv4_t       ipv4;
     ipv4_option_t  ipv4_option;
@@ -74,19 +83,20 @@ struct headers {
     switch_t[MAX_HOPS] swids;
 }
 
-error { IPHeaderTooShort }
+error { IPHeaderTooShort } // error - build in core.p4
 
 /*************************************************************************
 *********************** P A R S E R  ***********************************
 *************************************************************************/
 
-parser ParserImpl(packet_in packet,
+// keywords - in, out, inout
+parser ParserImpl(packet_in packet, // type: packet in - build in core.p4
 out headers hdr,
 inout metadata meta,
 inout standard_metadata_t standard_metadata) {
 
     state start {
-        transition parse_ethernet;
+        transition parse_ethernet; // transition = return
     }
 
     state parse_ethernet {
@@ -99,7 +109,7 @@ inout standard_metadata_t standard_metadata) {
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
-        verify(hdr.ipv4.ihl >= 5, error.IPHeaderTooShort);
+        verify(hdr.ipv4.ihl >= 5, error.IPHeaderTooShort); // build in
         transition select(hdr.ipv4.ihl) {
             5             : accept;
             default       : parse_ipv4_option;
@@ -142,7 +152,6 @@ control verifyChecksum(in headers hdr, inout metadata meta) {
     apply {  }
 }
 
-
 /*************************************************************************
 **************  I N G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
@@ -181,12 +190,12 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
 
     table swid {
-        actions        = { add_swid; }
+        actions        = { add_swid; NoAction; }
         default_action =  NoAction();      
     }
     
     table ipv4_lpm {
-        key = {
+        key = { 
             hdr.ipv4.dstAddr: lpm;
         }
         actions = {
@@ -198,9 +207,9 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         default_action = NoAction();
     }
     
-    apply {
-        if (hdr.ipv4.isValid()) {
-            ipv4_lpm.apply();
+    apply { // ingress logic
+        if (hdr.ipv4.isValid()) { // header is valid
+            ipv4_lpm.apply(); // apply(ipv4_lpm) in P4_14
             
             if (!hdr.mri.isValid()) {
                 add_mri_option();
@@ -254,7 +263,7 @@ inout metadata meta)
 ***********************  D E P A R S E R  *******************************
 *************************************************************************/
 
-control DeparserImpl(packet_out packet, in headers hdr) {
+control DeparserImpl(packet_out packet, in headers hdr) { // Deparser
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
